@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Nómina (Local y Persistente)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fb;
+            color: #1f2937;
+        }
+        .shadow-custom {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        input[type="time"]::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 min-h-screen">
+
+    <div class="max-w-7xl mx-auto">
+        <h1 class="text-3xl font-extrabold text-gray-900 mb-2 border-b-4 border-indigo-500 pb-2">
+            📊 Calculadora de Nómina Local (Offline)
+        </h1>
+        <p class="text-sm text-gray-500 mb-6">
+            **Nota Importante:** Los datos se guardan **automáticamente** en el navegador para que persistan entre sesiones.
+        </p>
+
+        <div id="alert-box" class="opacity-0 transition-opacity duration-300"></div>
+        
+        <div class="mb-8 p-6 bg-white rounded-xl shadow-custom border border-indigo-100">
+            <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-indigo-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c1.657 0 3 .895 3 2s-1.343 2-3 2-3-.895-3-2 1.343-2 3-2zM9 12h.01M15 12h.01M12 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2-1.343-2-3-2z" />
+                </svg>
+                Configuración y Recargos
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="col-span-1">
+                    <label for="hourly-rate" class="block text-sm font-medium text-gray-700">Valor Hora Normal (J2) - Tarifa Exacta ($483/240h)</label>
+                    <div class="mt-1 relative rounded-md shadow-sm">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <span class="text-gray-500 sm:text-sm">$</span>
+                        </div>
+                        <input type="number" id="hourly-rate" value="2.0125" step="0.0001" min="0.0001" class="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-7 pr-12 sm:text-sm border-gray-300 rounded-md p-2" placeholder="2.0125">
+                    </div>
+                </div>
+                <div class="col-span-1 bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+                    <p class="text-sm font-semibold text-indigo-800">Recargo Nocturno:</p>
+                    <p class="text-2xl font-extrabold text-indigo-900">
+                        +25%
+                    </p>
+                    <p class="text-xs text-indigo-600 mt-1">
+                        Aplica a horas entre **22:00 y 06:00**.
+                    </p>
+                </div>
+                <div class="col-span-1 bg-red-50 p-4 rounded-lg border border-red-200">
+                    <p class="text-sm font-semibold text-red-800">Recargo Feriado:</p>
+                    <p class="text-2xl font-extrabold text-red-900">
+                        +100%
+                    </p>
+                    <p class="text-xs text-red-600 mt-1">
+                        Aplica a **todas las horas pagadas** (E2) en un día feriado registrado.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-10 p-6 bg-white rounded-xl shadow-custom border border-purple-200">
+            <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-purple-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Gestión de Datos (Exportar/Importar Excel)
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                    <p class="text-sm font-semibold text-purple-800 mb-2">Exportar a Excel (.xlsx)</p>
+                    <button onclick="window.exportToExcel()" class="w-full bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-purple-700 transition duration-150">
+                        Descargar Reporte del Mes
+                    </button>
+                    <p class="text-xs text-purple-600 mt-2">Descarga el reporte con **fórmulas de cálculo** y el resumen de totales.</p>
+                </div>
+                <div class="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                    <p class="text-sm font-semibold text-purple-800 mb-2">Importar Turnos desde Excel</p>
+                    <input type="file" id="import-file-input" accept=".xlsx, .xls" onchange="window.importFromExcel(event)" class="w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-100 file:text-purple-700 hover:file:bg-purple-200"/>
+                    <p class="text-xs text-red-600 mt-2">
+                        **Advertencia:** Esto eliminará todos los turnos actuales almacenados localmente.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-10 p-6 bg-white rounded-xl shadow-custom border border-red-200">
+            <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-red-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Gestión de Días Feriados (100% Extra)
+            </h2>
+            <form id="add-holiday-form" onsubmit="window.addHoliday(event)" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end mb-4">
+                <div class="md:col-span-2">
+                    <label for="holiday-date-input" class="block text-sm font-medium text-gray-700">Agregar Fecha Feriada</label>
+                    <input type="date" id="holiday-date-input" required class="mt-1 focus:ring-red-500 focus:border-red-500 block w-full p-2 border border-gray-300 rounded-md">
+                </div>
+                <div>
+                    <button type="submit" class="w-full bg-red-600 text-white font-semibold py-2 px-4 border border-transparent rounded-lg shadow-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition duration-150">
+                        + Registrar Feriado
+                    </button>
+                </div>
+            </form>
+            <div class="bg-white p-4 rounded-lg border border-gray-200 mt-4 max-h-40 overflow-y-auto">
+                <h3 class="text-sm font-semibold mb-2 text-gray-700">Fechas Feriadas Registradas:</h3>
+                <ul id="holidays-list" class="space-y-1">
+                    <li class="text-sm text-gray-500 py-2">Cargando feriados...</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="mb-10 p-6 bg-white rounded-xl shadow-custom border border-blue-100">
+            <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Generar Horario Mensual Predeterminado
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <div class="md:col-span-2">
+                    <label for="month-year-input" class="block text-sm font-medium text-gray-700">Seleccionar Mes y Año</label>
+                    <input type="month" id="month-year-input" required class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full p-2 border border-gray-300 rounded-md">
+                    <p class="text-xs text-gray-500 mt-1">
+                        Se generarán turnos de 8 horas pagadas (08:30 - 17:00) para **SOLO 30 días** (del 1 al 30) para cubrir el sueldo base.
+                    </p>
+                </div>
+                <div>
+                    <button type="button" id="generate-button" onclick="window.generateDefaultShifts()" class="w-full bg-blue-600 text-white font-semibold py-2 px-4 border border-transparent rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150">
+                        Generar Turnos Predeterminados
+                    </button>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="mb-10 p-6 bg-white rounded-xl shadow-custom border border-green-100">
+            <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Registrar Turno Manual (o para editar excepciones)
+            </h2
+>
+            <form id="add-shift-form" onsubmit="window.addShift(event)" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                <div>
+                    <label for="shift-date" class="block text-sm font-medium text-gray-700">Fecha del Turno</label>
+                    <input type="date" id="shift-date" name="shift-date" required class="mt-1 focus:ring-green-500 focus:border-green-500 block w-full p-2 border border-gray-300 rounded-md">
+                </div>
+                <div>
+                    <label for="start-time" class="block text-sm font-medium text-gray-700">Hora Inicio (C2)</label>
+                    <input type="time" id="start-time" name="start-time" required class="mt-1 focus:ring-green-500 focus:border-green-500 block w-full p-2 border border-gray-300 rounded-md bg-white">
+                </div>
+                <div>
+                    <label for="end-time" class="block text-sm font-medium text-gray-700">Hora Fin (D2)</label>
+                    <input type="time" id="end-time" name="end-time" required class="mt-1 focus:ring-green-500 focus:border-green-500 block w-full p-2 border border-gray-300 rounded-md bg-white">
+                </div>
+                <button type="submit" class="w-full bg-green-600 text-white font-semibold py-2 px-4 border border-transparent rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-150">
+                    + Añadir Turno
+                </button>
+            </form>
+        </div>
+
+        <div class="overflow-x-auto bg-white rounded-xl shadow-custom">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 z-10 bg-gray-50">Fecha</th>
+                        <th scope="col" class="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Inicio (C2)</th>
+                        <th scope="col" class="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fin (D2)</th>
+                        <th scope="col" class="px-2 py-3 text-left text-xs font-medium text-blue-600 uppercase tracking-wider">Total Horas Pagadas (E2)</th>
+                        <th scope="col" class="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Normales (F2)</th>
+                        <th scope="col" class="px-2 py-3 text-left text-xs font-medium text-orange-600 uppercase tracking-wider">Extras 50% (G2)</th>
+                        <th scope="col" class="px-2 py-3 text-left text-xs font-medium text-red-600 uppercase tracking-wider">Extras 100% (H2)</th>
+                        <th scope="col" class="px-2 py-3 text-left text-xs font-medium text-purple-600 uppercase tracking-wider">Nocturnas (I2)</th>
+                        <th scope="col" class="px-2 py-3 text-left text-xs font-medium text-green-700 uppercase tracking-wider">Pago Total Diario (O2)</th>
+                        <th scope="col" class="px-2 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acción</th>
+                    </tr>
+                </thead>
+                <tbody id="shifts-body" class="bg-white divide-y divide-gray-200">
+                    </tbody>
+                <tfoot class="bg-gray-100 border-t-2 border-indigo-300">
+                    <tr id="totals-row" class="font-bold">
+                        </tr>
+                    <tr id="guaranteed-salary-row" class="font-bold bg-green-100 border-t-2 border-green-300">
+                        </tr>
+                    <tr id="final-total-row" class="font-bold bg-green-200 border-b-4 border-green-500">
+                        </tr>
+                </tfoot>
+            </table>
+        </div>
+        
+        <div class="mt-4 p-4 bg-gray-700 text-white rounded-xl shadow-lg">
+            <h3 class="text-lg font-bold mb-2">Detalles del Cálculo de Pago:</h3>
+            <ul class="text-sm space-y-1 list-disc list-inside">
+                <li><span class="font-bold text-red-300">Deducción:</span> Se restan automáticamente **30 minutos (0.5 horas)** del tiempo total trabajado para el tiempo de comida no remunerado.</li>
+                <li><span class="font-bold">Tasa Base (J2):</span> <span id="display-rate" class="text-yellow-300">$2.0125</span> (Tarifa exacta para que la base de 30 días sume $483.00)</li>
+                <li><span class="font-bold text-green-300">Sueldo Básico:</span> **$483.00** (Monto Fijo Garantizado por 30 días, tal como en su boleta)</li>
+                <li><span class="font-bold">Pago Total Diario (O2):</span> Base de $16.10 (por 8 horas netas) + Suma de todos los recargos y extras generados ese día.</li>
+                <li><span class="font-bold">TOTAL INGRESOS:</span> Se toma el valor más alto entre el Sueldo Básico Garantizado ($483.00) y la Suma de Horas Calculadas (si los recargos superan la base).</li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
