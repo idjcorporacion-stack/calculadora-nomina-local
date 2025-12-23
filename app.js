@@ -3,7 +3,7 @@ const SUELDO_BASE_GARANTIZADO = 483.00;
 const DESCUENTO_QUINCENA = 193.20;
 const TASA_IESS = 0.0945;
 
-// Variables de Estado (Arrays locales)
+// Variables de Estado
 let shifts = [];
 let holidays = [];
 
@@ -11,14 +11,12 @@ let holidays = [];
 // 1. GESTIÓN DE DATOS (LocalStorage)
 // ==========================================
 
-// Cargar datos al iniciar
 function loadData() {
     const savedShifts = localStorage.getItem('nomina_shifts');
     const savedHolidays = localStorage.getItem('nomina_holidays');
     const savedRate = localStorage.getItem('nomina_rate');
 
     if (savedShifts) {
-        // Convertimos las fechas de string a objeto Date
         shifts = JSON.parse(savedShifts).map(s => ({
             ...s,
             date: new Date(s.date)
@@ -37,15 +35,13 @@ function loadData() {
     renderShifts();
 }
 
-// Guardar datos
 function saveData() {
     localStorage.setItem('nomina_shifts', JSON.stringify(shifts));
     localStorage.setItem('nomina_holidays', JSON.stringify(holidays));
     localStorage.setItem('nomina_rate', document.getElementById('hourly-rate').value);
-    renderShifts(); // Recalcular al guardar
+    renderShifts();
 }
 
-// Borrar todo (Reset)
 function clearAllData() {
     if(confirm("¿Estás seguro de borrar todos los datos?")) {
         localStorage.clear();
@@ -56,12 +52,12 @@ function clearAllData() {
 }
 
 // ==========================================
-// 2. CÁLCULOS MATEMÁTICOS
+// 2. CÁLCULOS
 // ==========================================
 
 function calculateNightHours(startTimeStr, endTimeStr) {
-    const NIGHT_START = 22; // 10 PM
-    const NIGHT_END = 6;    // 6 AM
+    const NIGHT_START = 22; 
+    const NIGHT_END = 6;    
     let start = new Date();
     let end = new Date();
     const [startH, startM] = startTimeStr.split(':').map(Number);
@@ -70,16 +66,14 @@ function calculateNightHours(startTimeStr, endTimeStr) {
     start.setHours(startH, startM, 0, 0);
     end.setHours(endH, endM, 0, 0);
     
-    // Si la hora de fin es menor a la de inicio, es al día siguiente
     if (end.getTime() <= start.getTime()) { end.setDate(end.getDate() + 1); }
     
     let nightHours = 0;
     let currentTime = new Date(start.getTime());
     
-    // Iteramos minuto a minuto (precisión simple)
     while (currentTime.getTime() < end.getTime()) {
         let currentHour = currentTime.getHours();
-        let nextTime = new Date(currentTime.getTime() + 60000); // +1 minuto
+        let nextTime = new Date(currentTime.getTime() + 60000); 
         if (nextTime.getTime() > end.getTime()) nextTime = end;
         
         const isNight = (currentHour >= NIGHT_START && currentHour <= 23) || (currentHour >= 0 && currentHour < NIGHT_END);
@@ -104,17 +98,14 @@ function calculateShift(shift) {
     end.setHours(endH, endM, 0, 0);
     if (end.getTime() <= start.getTime()) { end.setDate(end.getDate() + 1); }
     
-    // Cálculo horas brutas menos 30 min de almuerzo
     const totalHoursRaw = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
     const totalHours = Math.max(0, totalHoursRaw - 0.5);
 
-    // Desglose de horas
     const normalHours = Math.min(totalHours, 8);
     const extra50Hours = totalHours > 8 ? Math.min(totalHours - 8, 2) : 0;
     const extra100Hours = totalHours > 10 ? totalHours - 10 : 0;
     const nightHours = calculateNightHours(shift.startTime, shift.endTime);
 
-    // Cálculos monetarios
     const basePay = totalHours * rate;
     const extra50Surcharge = extra50Hours * rate * 0.5;
     const extra100Surcharge = extra100Hours * rate * 1.0;
@@ -130,11 +121,10 @@ function calculateShift(shift) {
 }
 
 // ==========================================
-// 3. RENDERIZADO (MOSTRAR EN PANTALLA)
+// 3. RENDERIZADO
 // ==========================================
 
 function renderShifts() {
-    // Ordenar por fecha
     shifts.sort((a, b) => a.date - b.date);
 
     const tableBody = document.getElementById('shifts-body');
@@ -198,23 +188,20 @@ function renderHolidays() {
 }
 
 // ==========================================
-// 4. FUNCIONES DE INTERACCIÓN (BOTONES)
+// 4. FUNCIONES DE INTERACCIÓN
 // ==========================================
 
 function addShift(event) {
     event.preventDefault();
     const form = event.target;
-    
-    // Crear objeto turno
     const newShift = {
-        id: Date.now().toString(), // ID único simple
+        id: Date.now().toString(),
         date: new Date(form['shift-date'].value + 'T00:00:00'),
         startTime: form['start-time'].value,
         endTime: form['end-time'].value
     };
-
     shifts.push(newShift);
-    saveData(); // Guardar en LocalStorage
+    saveData();
     form.reset();
 }
 
@@ -223,11 +210,9 @@ function deleteShift(id) {
     saveData();
 }
 
-// Modal Editar
 function openEditModal(id) {
     const shift = shifts.find(s => s.id === id);
     if (!shift) return;
-    
     document.getElementById('edit-id').value = id;
     document.getElementById('edit-date').value = shift.date.toISOString().split('T')[0];
     document.getElementById('edit-start').value = shift.startTime;
@@ -243,7 +228,6 @@ function saveEdit(event) {
     event.preventDefault();
     const id = document.getElementById('edit-id').value;
     const index = shifts.findIndex(s => s.id === id);
-    
     if (index !== -1) {
         shifts[index].date = new Date(document.getElementById('edit-date').value + 'T00:00:00');
         shifts[index].startTime = document.getElementById('edit-start').value;
@@ -253,7 +237,6 @@ function saveEdit(event) {
     }
 }
 
-// Feriados
 function addHoliday(event) {
     event.preventDefault();
     const date = document.getElementById('holiday-date-input').value;
@@ -266,7 +249,7 @@ function addHoliday(event) {
 function deleteHoliday(id) {
     holidays = holidays.filter(h => h.id !== id);
     saveData();
-    renderHolidays(); // Actualizar lista visualmente
+    renderHolidays();
 }
 
 function generateDefaultShifts() {
@@ -275,34 +258,24 @@ function generateDefaultShifts() {
     
     if(confirm("Esto borrará los turnos actuales y generará nuevos para el mes seleccionado. ¿Continuar?")) {
         const [year, month] = monthYear.split('-').map(Number);
-        shifts = []; // Limpiar actuales
-        
+        shifts = [];
         for (let i = 1; i <= 30; i++) {
             const date = new Date(year, month - 1, i);
-            if (date.getMonth() !== month - 1) break; // Evitar días inválidos (ej: 31 feb)
-            
-            shifts.push({
-                id: Date.now().toString() + i, // ID único + indice
-                date: date,
-                startTime: '08:30',
-                endTime: '17:00'
-            });
+            if (date.getMonth() !== month - 1) break;
+            shifts.push({ id: Date.now().toString() + i, date: date, startTime: '08:30', endTime: '17:00' });
         }
         saveData();
     }
 }
 
 // ==========================================
-// 5. EXCEL (IMPORTAR Y EXPORTAR)
+// 5. EXCEL AVANZADO (IMPORT/EXPORT)
 // ==========================================
 
 function exportToExcel() {
     const rate = parseFloat(document.getElementById('hourly-rate').value);
     const filename = `Nomina_${new Date().toISOString().split('T')[0]}.xlsx`;
-    const rows = [];
-    
-    // Encabezados
-    rows.push(["Fecha", "Inicio", "Fin", "Total Horas", "Pago Diario", "Es Feriado"]);
+    const rows = [["Fecha", "Inicio", "Fin", "Total Horas", "Pago Diario", "Es Feriado"]];
     
     shifts.forEach(shift => {
         const calc = calculateShift(shift);
@@ -316,7 +289,6 @@ function exportToExcel() {
         ]);
     });
 
-    // Totales
     let totalBruto = shifts.reduce((sum, s) => sum + calculateShift(s).totalDailyPay, 0);
     rows.push(["", "", "", "TOTAL BRUTO:", totalBruto]);
 
@@ -326,6 +298,38 @@ function exportToExcel() {
     XLSX.writeFile(wb, filename);
 }
 
+// NUEVO: Parser robusto para fechas de Excel
+function parseExcelDate(val) {
+    // Caso 1: Es un objeto Date nativo (XLSX lo convirtió)
+    if (val instanceof Date) return val;
+
+    // Caso 2: Es un número serial de Excel (ej: 45200)
+    if (typeof val === 'number') {
+        const d = XLSX.SSF.parse_date_code(val);
+        return new Date(d.y, d.m - 1, d.d);
+    }
+
+    // Caso 3: Es un texto (ej: "13/01/2025" o "2025-01-13")
+    if (typeof val === 'string') {
+        // Intentar formato ISO YYYY-MM-DD
+        if (val.includes('-')) {
+            const date = new Date(val);
+            if (!isNaN(date.getTime())) return date;
+        }
+        // Intentar formato Latino DD/MM/YYYY
+        const parts = val.split('/');
+        if (parts.length === 3) {
+            // Asumimos DIA/MES/AÑO
+            const d = parseInt(parts[0], 10);
+            const m = parseInt(parts[1], 10) - 1; // Mes en JS es 0-11
+            const y = parseInt(parts[2], 10);
+            const date = new Date(y, m, d);
+            if (!isNaN(date.getTime())) return date;
+        }
+    }
+    return null; // No se pudo leer
+}
+
 function importFromExcel(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -333,47 +337,48 @@ function importFromExcel(event) {
     const reader = new FileReader();
     reader.onload = (e) => {
         const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+        // cellDates: false para leer fechas manualmente y evitar errores de zona horaria
+        const workbook = XLSX.read(data, { type: 'array', cellDates: false });
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
         
         let importedCount = 0;
         
-        // Buscar columnas (lógica simplificada)
-        // Asumimos estructura: Fecha | Inicio | Fin
-        // Empezamos a leer desde la fila 1 (la 0 son cabeceras probablemente)
-        for (let i = 1; i < rows.length; i++) {
+        // 1. LIMPIAR DATOS ANTERIORES
+        shifts = []; 
+
+        // Leer filas (saltando la cabecera si existe)
+        for (let i = 0; i < rows.length; i++) {
             const row = rows[i];
-            if (row.length < 3) continue;
+            
+            // Validaciones básicas de fila vacía
+            if (!row || row.length < 3) continue;
 
-            let dateVal = row[0];
-            let startVal = row[1];
-            let endVal = row[2];
+            // Detectar cabecera (si la celda dice "fecha", saltamos)
+            if (typeof row[0] === 'string' && row[0].toLowerCase().includes('fecha')) continue;
 
-            // Conversión de fecha Excel
-            let finalDate;
-            if (dateVal instanceof Date) finalDate = dateVal;
-            else finalDate = new Date(dateVal); // Intento básico
-
-            if (isNaN(finalDate.getTime())) continue; // Fecha inválida, saltar
+            // 2. USAR EL PARSER ROBUSTO
+            const finalDate = parseExcelDate(row[0]);
+            
+            // Si la fecha es inválida, saltamos esta fila
+            if (!finalDate || isNaN(finalDate.getTime())) continue;
 
             shifts.push({
                 id: Date.now().toString() + Math.random(),
                 date: finalDate,
-                startTime: formatExcelTime(startVal),
-                endTime: formatExcelTime(endVal)
+                startTime: formatExcelTime(row[1]),
+                endTime: formatExcelTime(row[2])
             });
             importedCount++;
         }
         
         saveData();
-        alert(`Se importaron ${importedCount} turnos.`);
-        event.target.value = ''; // Limpiar input
+        alert(`Se importaron ${importedCount} turnos correctamente (Datos anteriores borrados).`);
+        event.target.value = ''; 
     };
     reader.readAsArrayBuffer(file);
 }
 
-// Ayuda para formatear horas de Excel que a veces vienen como decimales (0.5 = 12:00)
 function formatExcelTime(val) {
     if (typeof val === 'string') return val.trim();
     if (typeof val === 'number') {
@@ -382,8 +387,7 @@ function formatExcelTime(val) {
         const minutes = Math.floor((totalSeconds % 3600) / 60);
         return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
     }
-    return "08:30"; // Valor por defecto si falla
+    return "08:30";
 }
 
-// INICIAR
 window.onload = loadData;
