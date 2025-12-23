@@ -298,36 +298,35 @@ function exportToExcel() {
     XLSX.writeFile(wb, filename);
 }
 
-// NUEVO: Parser robusto para fechas de Excel
+// PARSER ROBUSTO (Arregla el error de los 12 elementos)
 function parseExcelDate(val) {
-    // Caso 1: Es un objeto Date nativo (XLSX lo convirtió)
-    if (val instanceof Date) return val;
-
-    // Caso 2: Es un número serial de Excel (ej: 45200)
+    // 1. Números de Excel (La forma más segura)
     if (typeof val === 'number') {
         const d = XLSX.SSF.parse_date_code(val);
         return new Date(d.y, d.m - 1, d.d);
     }
 
-    // Caso 3: Es un texto (ej: "13/01/2025" o "2025-01-13")
+    // 2. Textos
     if (typeof val === 'string') {
-        // Intentar formato ISO YYYY-MM-DD
-        if (val.includes('-')) {
-            const date = new Date(val);
-            if (!isNaN(date.getTime())) return date;
-        }
-        // Intentar formato Latino DD/MM/YYYY
-        const parts = val.split('/');
+        val = val.trim();
+        // Intentar formato DD/MM/YYYY (Común en Ecuador)
+        const parts = val.split(/[\/\-]/);
         if (parts.length === 3) {
-            // Asumimos DIA/MES/AÑO
+            // Asumimos DD-MM-YYYY
             const d = parseInt(parts[0], 10);
-            const m = parseInt(parts[1], 10) - 1; // Mes en JS es 0-11
+            const m = parseInt(parts[1], 10) - 1; // Meses son 0-11
             const y = parseInt(parts[2], 10);
-            const date = new Date(y, m, d);
-            if (!isNaN(date.getTime())) return date;
+            
+            // Validación básica
+            if (m >= 0 && m <= 11 && d >= 1 && d <= 31) {
+                return new Date(y, m, d);
+            }
         }
+        // Intentar lectura nativa como respaldo
+        const date = new Date(val);
+        if (!isNaN(date.getTime())) return date;
     }
-    return null; // No se pudo leer
+    return null; 
 }
 
 function importFromExcel(event) {
@@ -337,30 +336,29 @@ function importFromExcel(event) {
     const reader = new FileReader();
     reader.onload = (e) => {
         const data = new Uint8Array(e.target.result);
-        // cellDates: false para leer fechas manualmente y evitar errores de zona horaria
+        
+        // ¡IMPORTANTE! cellDates: false obliga a leer datos crudos para no confundir meses
         const workbook = XLSX.read(data, { type: 'array', cellDates: false });
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
         
         let importedCount = 0;
         
-        // 1. LIMPIAR DATOS ANTERIORES
+        // 1. LIMPIAR DATOS ANTERIORES (Para que no se monten encima)
         shifts = []; 
 
         // Leer filas (saltando la cabecera si existe)
         for (let i = 0; i < rows.length; i++) {
             const row = rows[i];
             
-            // Validaciones básicas de fila vacía
             if (!row || row.length < 3) continue;
 
-            // Detectar cabecera (si la celda dice "fecha", saltamos)
+            // Saltar cabecera
             if (typeof row[0] === 'string' && row[0].toLowerCase().includes('fecha')) continue;
 
             // 2. USAR EL PARSER ROBUSTO
             const finalDate = parseExcelDate(row[0]);
             
-            // Si la fecha es inválida, saltamos esta fila
             if (!finalDate || isNaN(finalDate.getTime())) continue;
 
             shifts.push({
@@ -373,7 +371,7 @@ function importFromExcel(event) {
         }
         
         saveData();
-        alert(`Se importaron ${importedCount} turnos correctamente (Datos anteriores borrados).`);
+        alert(`Se importaron ${importedCount} turnos correctamente. (Lista anterior borrada)`);
         event.target.value = ''; 
     };
     reader.readAsArrayBuffer(file);
@@ -382,6 +380,7 @@ function importFromExcel(event) {
 function formatExcelTime(val) {
     if (typeof val === 'string') return val.trim();
     if (typeof val === 'number') {
+        // Excel guarda horas como fracción del día (ej: 0.5 es mediodía)
         const totalSeconds = Math.round(val * 24 * 3600);
         const hours = Math.floor(totalSeconds / 3600);
         const minutes = Math.floor((totalSeconds % 3600) / 60);
